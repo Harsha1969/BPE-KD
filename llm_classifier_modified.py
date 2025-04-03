@@ -105,12 +105,11 @@ class LLMClassifier(object):
         input_text = self.format_content(input_text)
         
         # Get Dirichlet parameters and class probabilities
-        alpha_c, probs = self.model.class_probabilities(instruction, input_text, self.classes_for_matching[0])
+        alpha_c = self.model.class_probabilities(instruction, input_text, self.classes_for_matching[0])
 
         alpha_c = alpha_c.to(self.device)
-        probs = probs.to(self.device)
 
-        return alpha_c, probs
+        return alpha_c
 
     def soft_labels_batch(self, instruction=None, input_texts='', input_examples=None, labels_examples=None):
         """
@@ -126,49 +125,8 @@ class LLMClassifier(object):
             tuple: (all_alpha, all_probs) stacked tensors of Dirichlet parameters and probabilities.
         """
         all_alpha, all_probs = [], []
-        for i in tqdm(range(len(input_texts)), disable=True):
-            alpha_i, probs_i = self.soft_label(instruction, input_texts[i], input_examples, labels_examples)
+        for i in tqdm(range(len(input_texts))):
+            alpha_i = self.soft_label(instruction, input_texts[i], input_examples, labels_examples)
             all_alpha.append(alpha_i)
-            all_probs.append(probs_i)
     
-        return torch.stack(all_alpha), torch.stack(all_probs)
-
-    def sample_probs_ensemble(self, instructions, input_texts, examples_dict=None, n_samples=None, indices=None):
-        """
-        Samples probabilities using an ensemble of prompts.
-
-        Args:
-            instructions (list): List of prompt instructions.
-            input_texts (list): List of input texts.
-            examples_dict (dict, optional): Dictionary of example inputs and labels.
-            n_samples (int, optional): Number of samples.
-            indices (list, optional): Indices for sampling.
-
-        Returns:
-            tuple: (logits, probs) numpy arrays of sampled logits and probabilities.
-        """
-        if n_samples is None:
-            n_samples = len(instructions)
-        n_classes = len(self.classes_strings)
-
-        logits = np.zeros((len(input_texts), n_classes, n_samples))
-        probs = np.zeros((len(input_texts), n_classes, n_samples))
-
-        if indices is None:
-            indices = np.arange(n_samples)
-
-        for ni, i in enumerate(indices):
-            ind = int(i % len(instructions))
-            input_examples = examples_dict.get(f'input_examples_{ind}') if examples_dict else None
-            labels_examples = examples_dict.get(f'label_examples_{ind}') if examples_dict else None
-
-            print(f'Inference for prompt {ni+1} out of {len(indices)}')
-
-            logits_i, probs_i = self.soft_labels_batch(
-                instructions[ind], input_texts, input_examples=input_examples, labels_examples=labels_examples
-            )
-
-            logits[:, :, ni] = logits_i.cpu().numpy()
-            probs[:, :, ni] = probs_i.cpu().numpy()
-
-        return logits, probs
+        return torch.stack(all_alpha)
