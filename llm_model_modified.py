@@ -5,17 +5,18 @@ import transformers
 from peft import get_peft_model, LoraConfig, TaskType
 
 class LLM(object):
-    def __init__(self, model_name="mistralai/Mistral-7B-Instruct-v0.3", temperature=0.7, max_tokens=200, use_pipeline=False, use_reduced_precision=False, use_lora=True):
+    def __init__(self, model_name="mistralai/Mistral-7B-Instruct-v0.3", temperature=0.7, max_tokens=200, use_pipeline=False, use_reduced_precision=True, use_lora=True):
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.use_pipeline = use_pipeline
-        self.use_lora = use_lora  # Enable LoRA
+        self.use_lora = use_lora
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # Load tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, trust_remote_code=True)
 
+        # Enable mixed precision
         model_dtype = torch.float16 if use_reduced_precision and torch.cuda.is_available() else torch.float32
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_name, trust_remote_code=True, torch_dtype=model_dtype, device_map="auto"
@@ -23,7 +24,7 @@ class LLM(object):
 
         if self.use_lora:
             self.apply_lora()
-
+        
         self.generate_kwargs = {
             "temperature": temperature,
             "max_new_tokens": max_tokens,
@@ -34,56 +35,68 @@ class LLM(object):
         }
 
     def apply_lora(self):
-        """Apply LoRA for efficient fine-tuning without modifying full model."""
+        """Apply LoRA for efficient fine-tuning without modifying the full model."""
         lora_config = LoraConfig(
             task_type=TaskType.CAUSAL_LM,
-            r=16,  # LoRA rank
-            lora_alpha=32,  # Scaling factor
+            r=8,  
+            lora_alpha=16, 
             lora_dropout=0.05,
-            target_modules=["q_proj", "v_proj"]  # Apply only to attention layers
+            target_modules=["q_proj","k_proj", "v_proj","o_proj", "lm_head"] 
         )
         self.model = get_peft_model(self.model, lora_config)
         self.model.print_trainable_parameters()
-
+    
+                
     def return_logits(self, instructions, content=None):
-        """Returns the logits of the model for given instructions and content."""
-        prompt_text = f"{instructions}\n{content}" if content else f"{instructions}"
+        if content is not None:
+            prompt_text = f"{instructions}\n{content}"
+        else:
+            prompt_text = f"{instructions}"
+    
         indexed_tokens = self.tokenizer.encode(prompt_text, return_tensors="pt").to(self.device)
+    
+        outputs = self.model(indexed_tokens) 
+    
+        logits = outputs.logits[0, -1, :]  
+    
+        return logits
 
-        outputs = self.model(indexed_tokens)
-        return outputs.logits[0, -1, :].to(self.device)
-
+    
     def word_logit(self, logits, word):
-        """Extracts the logit for a specific word token."""
-        token_ids = self.tokenizer.encode(word, add_special_tokens=False)
-        if len(token_ids) > 1:
-            raise ValueError(f"Word '{word}' is tokenized into multiple tokens: {token_ids}")
-        return logits[token_ids[0]].to(self.device)
-
+          """
+          given logits over the vocabulary and a word, it returns the logit for the word.
+    
+          :param logits: logits over the vocabulary [n_vocabulary].
+          :param word: string containing the word to index (if multiple words given, it uses the first one).
+    
+          :return: logit(word).
+          """
+          if self.model_name.startswith('mistralai') or self.model_name.startswith('google'):
+              idx = self.tokenizer.encode(word)[1]
+          else:
+              idx = self.tokenizer.encode(word)[0]
+          return logits[idx].to(dtype=torch.float32)
+        
     def class_probabilities(self, instructions, content, class_words):
-        """Returns Dirichlet parameters and probabilities."""
+        """Compute class probabilities given class keywords."""
         logits = self.return_logits(instructions, content)
-
-        class_logits = torch.tensor(
-            [self.word_logit(logits, word) for word in class_words], 
-            device=self.device, dtype=torch.float32, requires_grad=True
-        )
-
-        # Convert logits into Dirichlet parameters
+        class_logits = torch.zeros(len(class_words), device=logits.device)
+        
+        for i, word in enumerate(class_words):
+            class_logits[i] = self.word_logit(logits, word)
+        
         alpha_c = torch.nn.functional.softplus(class_logits) + 1  
-        probs = torch.nn.functional.softmax(class_logits, dim=0)
-
-        return alpha_c, probs
+        return alpha_c
 
     def generate_text(self, instructions, content):
         """Generates text using the model."""
         prompt_text = f"{instructions}\n\n{content}\n"
-        
+
         if self.use_pipeline:
+            if not hasattr(self, 'pipeline'):
+                self.pipeline = transformers.pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
             sequences = self.pipeline(
                 prompt_text,
-                do_sample=True,
-                top_k=10,
                 num_return_sequences=1,
                 max_length=self.max_tokens,
                 **self.generate_kwargs
@@ -91,6 +104,10 @@ class LLM(object):
             return sequences[0]['generated_text'][len(prompt_text):]
         
         indexed_tokens = self.tokenizer.encode(prompt_text, return_tensors="pt").to(self.device)
+        
         with torch.no_grad():
-            outputs = self.model.module.generate(indexed_tokens, **self.generate_kwargs) if isinstance(self.model, nn.DataParallel) else self.model.generate(indexed_tokens, **self.generate_kwargs)
+            outputs = self.model.generate(indexed_tokens, **self.generate_kwargs)
+        
+        torch.cuda.empty_cache()  # Free GPU memory after generation
+        
         return self.tokenizer.decode(outputs[0])[len(prompt_text):]
