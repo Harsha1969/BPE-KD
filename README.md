@@ -1,4 +1,4 @@
-# 🔍 Uncertainty Modeling in Large Language Models (LLMs)
+# Uncertainty Modeling in Large Language Models (LLMs)
 
 This project presents a framework for efficient uncertainty estimation in Large Language Models (LLMs) by distilling the knowledge from a Bayesian Prompt Ensemble (BayesPE) into a student LLM. The approach allows reliable uncertainty estimation in a **single forward pass**, overcoming the computational inefficiencies of traditional Bayesian inference methods.
 
@@ -46,7 +46,7 @@ The student model outputs Dirichlet concentration parameters instead of softmax 
  ├── bpe.py, ensemble_scaler.py # BayesPE training utils
  ├── constants.py, requirements.txt # Config and dependencies
 
-## 🔧 Setup Instructions
+## Setup Instructions
 
 ### Install dependencies
 
