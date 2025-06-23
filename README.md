@@ -71,7 +71,7 @@ sst2_softmax_student.ipynb
 yahoo_softmax_student.ipynb
 youtube_softmax_student.ipynb
 ```
-#### 2B. Dirichlet-based Student (using Weighted Dirichlet Likelihood Loss)
+#### 2B. Dirichlet-based Student (using Dirichlet based distillation Loss)
 
 For each dataset, run the corresponding notebook to:
 - This student learns to predict Dirichlet parameters that match the teacher's ensembled behavior.
