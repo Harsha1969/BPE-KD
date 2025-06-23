@@ -85,6 +85,6 @@ sst2_dirichlet_student.ipynb
 yahoo_dirichlet_student.ipynb
 youtube_dirichlet_student.ipynb
 ```
-Make sure the files *_probs.pt and *_prompt_weights.pt exist before training the student.
+Make sure the files *_probs.pt and *_prompt_weights.pt exist before training the student.  
 The notebooks `amazon_teacher.ipynb`, `amazon_softmax_student.ipynb`, and `amazon_dirichlet_student.ipynb` also include **out-of-distribution (OOD) evaluation**.  
 These models are trained only on the **Amazon Reviews** dataset but tested on other domains such as **Yahoo Answers**, **SST-2**, and **YouTube Comments** to assess out-of-distribution detection abilities of model and predictive uncertainty.
