@@ -30,7 +30,7 @@ The student model outputs Dirichlet concentration parameters instead of softmax 
 | Amazon Reviews     | Sentiment Analysis   | 10,000        | 5,000        |
 | SST-2              | Sentiment Analysis   | 10,000        | 872          |
 | Yahoo Answers      | Topic Classification | 10,000        | 5,000        |
-| YouTube Comments   | Social Media         | 1,100         | 711          |
+| YouTube Comments   | Spam Detection       | 1,100         | 711          |
 
 ---
 
@@ -52,3 +52,21 @@ The student model outputs Dirichlet concentration parameters instead of softmax 
 
 ```bash
 pip install -r requirements.txt
+```
+## How to Run
+
+All scripts use **Mistral-7B-Instruct v0.3** as the base model and require GPU (A100 recommended ~40GB).
+
+### Step 1: Run the Teacher (BayesPE) Inference
+
+For each dataset, run the corresponding notebook to:
+- Query the model with multiple prompts.
+- Save prompt-wise class probabilities and learned weights.
+
+```bash
+# Open and run the notebook
+amazon_teacher.ipynb
+sst2_teacher.ipynb
+yahoo_teacher.ipynb
+youtube_teacher.ipynb
+```
