@@ -32,20 +32,6 @@ The student model outputs Dirichlet concentration parameters instead of softmax 
 | Yahoo Answers      | Topic Classification | 10,000        | 5,000        |
 | YouTube Comments   | Spam Detection       | 1,100         | 711          |
 
----
-
-## Project Structure
- ├──train_* .csv / test_* .csv # Preprocessed datasets  
- ├── *_teacher.ipynb # BayesPE inference scripts  
- ├── *_softmax_student.ipynb # KL-trained student models (softmax)  
- ├── *_dirichlet_student.ipynb # Dirichlet-trained student models  
- ├── *_probs.pt # Teacher predictions (prompt-wise)  
- ├── *_prompt_weights.pt # Learned prompt weights per sample  
- ├── evaluation.py # Final evaluation: F1, ECE, entropy, timing  
- ├── llm_model.py, llm_classifier.py # Model loaders and wrappers  
- ├── bpe.py, ensemble_scaler.py # BayesPE training utils  
- ├── constants.py, requirements.txt # Config and dependencies  
-
 ## Setup Instructions
 
 ### Install dependencies
@@ -69,4 +55,15 @@ amazon_teacher.ipynb
 sst2_teacher.ipynb
 yahoo_teacher.ipynb
 youtube_teacher.ipynb
+```
+### Step 2: Train the Student Models
+#### 2A. Softmax-based Student (using KL Divergence Loss)
+
+Train using the best prompt from BayesPE and KL divergence between student and teacher probabilities.
+```bash
+# Open and run the notebook
+amazon_softmax_student.ipynb
+sst2_softmax_student.ipynb
+yahoo_softmax_student.ipynb
+youtube_softmax_student.ipynb
 ```
