@@ -35,16 +35,16 @@ The student model outputs Dirichlet concentration parameters instead of softmax 
 ---
 
 ## Project Structure
- ├──train_*.csv / test_*.csv # Preprocessed datasets
- ├── *_teacher.ipynb # BayesPE inference scripts
- ├── *_softmax_student.ipynb # KL-trained student models (softmax)
- ├── *_dirichlet_student.ipynb # Dirichlet-trained student models
- ├── *_probs.pt # Teacher predictions (prompt-wise)
- ├── *_prompt_weights.pt # Learned prompt weights per sample
- ├── evaluation.py # Final evaluation: F1, ECE, entropy, timing
- ├── llm_model.py, llm_classifier.py # Model loaders and wrappers
- ├── bpe.py, ensemble_scaler.py # BayesPE training utils
- ├── constants.py, requirements.txt # Config and dependencies
+ ├──train_*.csv / test_*.csv # Preprocessed datasets  
+ ├── *_teacher.ipynb # BayesPE inference scripts  
+ ├── *_softmax_student.ipynb # KL-trained student models (softmax)  
+ ├── *_dirichlet_student.ipynb # Dirichlet-trained student models  
+ ├── *_probs.pt # Teacher predictions (prompt-wise)  
+ ├── *_prompt_weights.pt # Learned prompt weights per sample  
+ ├── evaluation.py # Final evaluation: F1, ECE, entropy, timing  
+ ├── llm_model.py, llm_classifier.py # Model loaders and wrappers  
+ ├── bpe.py, ensemble_scaler.py # BayesPE training utils  
+ ├── constants.py, requirements.txt # Config and dependencies  
 
 ## Setup Instructions
 
