@@ -35,7 +35,7 @@ The student model outputs Dirichlet concentration parameters instead of softmax 
 ---
 
 ## Project Structure
- ├──train_*.csv / test_*.csv # Preprocessed datasets  
+ ├──train_* .csv / test_* .csv # Preprocessed datasets  
  ├── *_teacher.ipynb # BayesPE inference scripts  
  ├── *_softmax_student.ipynb # KL-trained student models (softmax)  
  ├── *_dirichlet_student.ipynb # Dirichlet-trained student models  
