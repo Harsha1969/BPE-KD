@@ -32,6 +32,7 @@ The student model outputs Dirichlet concentration parameters instead of softmax 
 | Yahoo Answers      | Topic Classification | 10,000        | 5,000        |
 | YouTube Comments   | Spam Detection       | 1,100         | 711          |
 
+Datasets can be accessed from the link: https://drive.google.com/drive/folders/1dcoBRWcEM9eFrzFYsrh5YXLxXyqOi7gT?usp=sharing
 ## Setup Instructions
 
 ### Install dependencies
