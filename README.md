@@ -48,6 +48,7 @@ All scripts use **Mistral-7B-Instruct v0.3** as the base model and require GPU (
 For each dataset, run the corresponding notebook to:
 - Query the model with multiple prompts.
 - Save prompt-wise class probabilities and learned weights.
+- Evaluate performance on the test data.
 
 ```bash
 # Open and run the notebook
@@ -59,7 +60,10 @@ youtube_teacher.ipynb
 ### Step 2: Train the Student Models
 #### 2A. Softmax-based Student (using KL Divergence Loss)
 
-Train using the best prompt from BayesPE and KL divergence between student and teacher probabilities.
+For each dataset, run the corresponding notebook to:
+- Train using the best prompt from BayesPE and KL divergence between student and teacher probabilities.
+- Evaluate performance on the test data.
+  
 ```bash
 # Open and run the notebook
 amazon_softmax_student.ipynb
@@ -67,3 +71,18 @@ sst2_softmax_student.ipynb
 yahoo_softmax_student.ipynb
 youtube_softmax_student.ipynb
 ```
+#### 2B. Dirichlet-based Student (using Weighted Dirichlet Likelihood Loss)
+
+For each dataset, run the corresponding notebook to:
+- This student learns to predict Dirichlet parameters that match the teacher's ensembled behavior.
+- Train using the best prompt from BayesPE and dirichlet based distillation loss between student and teacher probabilities.
+- Evaluate performance on the test data.
+
+```bash
+# Open and run the notebook
+amazon_dirichlet_student.ipynb
+sst2_dirichlet_student.ipynb
+yahoo_dirichlet_student.ipynb
+youtube_dirichlet_student.ipynb
+```
+Make sure the files *_probs.pt and *_prompt_weights.pt exist before training the student.
