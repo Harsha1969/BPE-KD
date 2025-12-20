@@ -163,7 +163,7 @@ python amazon_dirichlet_student.py
 python amazon_dirichlet_student.py --mode fixed --fixed_alpha0 10
 
 # Learnable alpha0 student
-python amazon_student.py --mode learnable --lr_alpha0 1e-3 --beta 1.0
+python amazon_dirichlet_student.py --mode learnable --lr_alpha0 1e-3 --beta 1.0
 ```
 Make sure the files *_probs.pt and *_prompt_weights.pt exist before training the student which can be accesible from the link: https://drive.google.com/drive/folders/1dcoBRWcEM9eFrzFYsrh5YXLxXyqOi7gT?usp=sharing
   
