@@ -18,7 +18,7 @@ import evaluation
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--mode",choices=["normal", "fixed", "learnable"],default="normal",help="Training mode: normal | fixed alpha0 | learnable alpha0")
+parser.add_argument("--mode",choices=["standard", "fixed", "learnable"],default="standard",help="Training mode: standard | fixed alpha0 | learnable alpha0")
 parser.add_argument("--epochs",type=int,default=50,help="Number of training epochs")
 parser.add_argument("--batch_size",type=int,default=32,help="Batch size for training")
 parser.add_argument("--lr",type=float,default=1e-6,help="Learning rate for LLM parameters")
@@ -268,3 +268,4 @@ def train_student():
 
 evaluate()
 train_student()
+
