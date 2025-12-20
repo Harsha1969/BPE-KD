@@ -191,7 +191,7 @@ def train_student():
     else:
         optimizer = optim.AdamW(llm_params, lr=args.lr)
 
-      for epoch in range(args.epochs):
+    for epoch in range(args.epochs):
         total_loss = 0.0
         total_dirichlet_loss = 0.0
         total_regularizer_loss = 0.0
@@ -263,5 +263,6 @@ def train_student():
 
 evaluate()
 train_student()
+
 
 
