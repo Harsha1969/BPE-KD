@@ -157,13 +157,13 @@ Regularization strength for the learnable α₀ prior.
 
 ```bash
 # Standard Dirichlet student
-python train.py --mode standard
+python amazon_dirichlet_student.py
 
 # Fixed alpha0 student
-python train.py --mode fixed --fixed_alpha0 10
+python amazon_dirichlet_student.py --mode fixed --fixed_alpha0 10
 
 # Learnable alpha0 student
-python train.py --mode learnable --lr_alpha0 1e-3 --beta 1.0
+python amazon_student.py --mode learnable --lr_alpha0 1e-3 --beta 1.0
 ```
 Make sure the files *_probs.pt and *_prompt_weights.pt exist before training the student which can be accesible from the link: https://drive.google.com/drive/folders/1dcoBRWcEM9eFrzFYsrh5YXLxXyqOi7gT?usp=sharing
   
