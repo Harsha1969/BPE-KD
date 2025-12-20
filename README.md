@@ -4,13 +4,6 @@ This project presents a framework for efficient uncertainty estimation in Large 
 
 The student model outputs Dirichlet concentration parameters instead of softmax probabilities, enabling it to represent both predicted class probabilities and the associated confidence. Fine-tuning is done using **LoRA** (Low-Rank Adaptation) for memory efficiency.
 
-## Updated results
-
-![OOD detection performance](evaluation_results/ood_detection_W1_AUROC.png "OOD detection performance")
-
-![Decomposition of predictive entropy for OOD datasets](evaluation_results/ood_entropy_decomposition.png "Decomposition of predictive entropy for OOD datasets")
-
-
 ---
 
 ## Approach Overview
