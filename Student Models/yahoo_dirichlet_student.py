@@ -306,7 +306,7 @@ def train_student():
     else:
         optimizer = optim.AdamW(llm_params, lr=learning_rate)
 
-      for epoch in range(args.epochs):
+    for epoch in range(args.epochs):
         total_loss = 0.0
         total_dirichlet_loss = 0.0
         total_regularizer_loss = 0.0
@@ -386,5 +386,6 @@ alpha_test = evaluate()
 #sst2_uncertainties(epoch)
 #youtube_uncertainties(epoch)
 train_student()
+
 
 
