@@ -32,7 +32,7 @@ class LLM(object):
         )
 
         if self.use_lora:
-            set_seed(0)
+            set_seed(1)
             self.apply_lora()
         
         self.generate_kwargs = {
