@@ -201,8 +201,10 @@ def train_student():
     else:
         optimizer = optim.AdamW(llm_params, lr=args.lr)
 
-    for epoch in range(args.epochs):
+   for epoch in range(args.epochs):
         total_loss = 0.0
+        total_dirichlet_loss = 0.0
+        total_regularizer_loss = 0.0
         llm.model.train()
         epoch_alphas = []
 
@@ -231,14 +233,17 @@ def train_student():
 
             epoch_alphas.append(alpha.detach().cpu())
             total_loss += loss.item()
+            if args.mode == "learnable":
+                total_dirichlet_loss += dirichlet_loss_term.item()
+                total_regularizer_loss += regularizer_loss.item()
 
         epoch_alpha = torch.cat(epoch_alphas, dim=0)
 
         if args.mode == "learnable":
             print(
                 f"Epoch {epoch+1}/{args.epochs}, "
-                f"Dirichlet Loss: {dirichlet_loss_term}, "
-                f"Regularizer Loss: {regularizer_loss}, "
+                f"Dirichlet Loss: {total_dirichlet_loss}, "
+                f"Regularizer Loss: {total_regularizer_loss}, "
                 f"Loss: {total_loss}, "
                 f"alpha0_prior: {torch.exp(a).item()}"
             )
@@ -268,4 +273,5 @@ def train_student():
 
 evaluate()
 train_student()
+
 
