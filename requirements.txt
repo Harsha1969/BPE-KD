@@ -8,3 +8,4 @@ accelerate
 pandas
 torchmetrics
 sentencepiece
+peft
