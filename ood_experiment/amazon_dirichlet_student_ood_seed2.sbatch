@@ -12,4 +12,4 @@
 #SBATCH --error=amazon_dirichlet_student_ood_seed2-%j.err
 
 source .env/bin/activate
-python python amazon_dirichlet_student_ood.py
+python amazon_dirichlet_student_ood.py
