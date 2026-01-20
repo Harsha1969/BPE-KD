@@ -9,7 +9,7 @@ The student model outputs **Dirichlet concentration parameters** instead of soft
 ## Approach Overview
 
 ### 1. **Teacher Models – Bayesian Uncertainty Estimators**
-This framework uses Bayesian teacher models to generate uncertainty-aware predictive distributions.
+Bayesian teacher models are used to generate uncertainty-aware predictive distributions.
 
 - **Bayesian Prompt Ensembles (BayesPE)**
   - Multiple semantically equivalent prompts are queried.
