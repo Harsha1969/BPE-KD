@@ -58,7 +58,7 @@ llm = LLM(
 
 classifier = LLMClassifier(model=llm, prompt_formatting=PromptFormatting())
 
-teacher_probs = torch.load("amazon_llora_teacher_probs.pt", map_location="cpu")
+probs = torch.load("amazon_llora_teacher_probs.pt", map_location="cpu")
 weights = torch.full((10000,), 1.0 / 10000.0).to(llm.device)
 
 class DirichletDataset(Dataset):
@@ -359,6 +359,7 @@ yahoo_uncertainties("pretrained")
 youtube_uncertainties("pretrained")
 train_student()
 save_uncertainty_buffer()
+
 
 
 
