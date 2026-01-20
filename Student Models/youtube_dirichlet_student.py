@@ -1,19 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import os
 import argparse
-
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
 import pandas as pd
 import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-
-from llm_classifier_modified import LLMClassifier
-from llm_model_modified_Copy2 import LLM
+from llm_classifier_student import LLMClassifier
+from llm_model_dirichlet_student import LLM
 import evaluation
 
 
@@ -271,6 +265,7 @@ def train_student():
 
 evaluate()
 train_student()
+
 
 
 
