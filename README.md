@@ -2,7 +2,11 @@
 
 This project presents a framework for efficient uncertainty estimation in Large Language Models (LLMs) by distilling uncertainty-aware knowledge from **Bayesian teacher models** into a student LLM.
 
-The student model outputs **Dirichlet concentration parameters** instead of softmax probabilities, enabling it to represent both predicted class probabilities and associated uncertainty. Fine-tuning is done using **LoRA** (Low-Rank Adaptation) for memory efficiency.
+The student models used are of two variants:
+1. Softmax student which outputs probabilities
+2. Dirichlet student which outputs **dirichlet concentration parameters** instead of softmax probabilities, enabling it to represent both predicted class probabilities and associated uncertainty.
+
+Fine-tuning is done using **LoRA** (Low-Rank Adaptation) for memory efficiency.
 
 ---
 
