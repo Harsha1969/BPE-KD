@@ -233,15 +233,15 @@ def evaluate():
     test_dataset = DirichletDataset(samples_test, n_test)
     test_dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False) 
     
-    def get_test_alpha(test_dataloader, classifier):
-        all_alpha = []
+    def get_test_probs(test_dataloader, classifier):
+        all_probs = []
     
         with torch.no_grad():
             for batch_samples in test_dataloader:
-                alpha_batch = classifier.soft_labels_batch(input_texts=batch_samples)
-                all_alpha.append(alpha_batch)
+                probs_batch = classifier.soft_labels_batch(input_texts=batch_samples)
+                all_probs.append(probs_batch)
     
-        return torch.cat(all_alpha, dim=0) 
+        return torch.cat(all_probs, dim=0) 
 
 
 
@@ -254,7 +254,7 @@ def evaluate():
     brier = evaluation.compute_metric(gt_labels_test, stu_probs, metric='brier')
 
     print('Student test f1-score: {}, Student test ECE: {}, Student test Accuracy: {}, Student test NLL: {},Student test brier score: {}'.format(f1_score, ece,acc,nll,brier))
-
+    return stu_probs
 
 # In[ ]:
 
