@@ -23,13 +23,16 @@ This framework uses Bayesian teacher models to generate uncertainty-aware predic
 
 Both teacher models provide calibrated predictive distributions used for student distillation.
 
-### 2. **Student Model – Dirichlet Output LLM**
-- Final layer modified to produce Dirichlet parameters: `α = 1 + softplus(logits)`.
+### 2. **Student Model**
+- Two variants of student models are trained i.e. softmax and dirichlet output students.
+- Softmax student is the standard model which outputs probabilities.
+- It is trained using **KL divergence loss**.
+- Dirichlet student has modified final layer which produce Dirichlet parameters instead of probabilities: `α = 1 + softplus(logits)`.
 - Trained using a **Dirichlet-based distillation loss** to match teacher behavior.
 - LoRA adapters used for efficient fine-tuning.
 
 ### 3. **Single-Pass Inference**
-- Once trained, the student can output both probabilities and uncertainties using a single forward pass.
+- Once trained, the student can output both predictions and uncertainties using a single forward pass.
 
 ---
 
