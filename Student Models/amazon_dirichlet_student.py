@@ -2,49 +2,44 @@
 # coding: utf-8
 
 import os
+import sys
 import argparse
-
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-
+import logging
+import builtins
 import pandas as pd
 import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torch.special import digamma
+from collections import defaultdict
 
 from llm_classifier_modified import LLMClassifier
-from llm_model_modified_Copy2 import LLM
-import evaluation
+from llm_model_modified import LLM
 
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--mode",choices=["standard", "fixed", "learnable"],default="standard",help="Training mode: standard | fixed alpha0 | learnable alpha0")
-parser.add_argument("--epochs",type=int,default=50,help="Number of training epochs")
-parser.add_argument("--batch_size",type=int,default=16,help="Batch size for training")
-parser.add_argument("--lr",type=float,default=1e-5,help="Learning rate for LLM parameters")
-parser.add_argument("--fixed_alpha0",type=float,default=10.0,help="Fixed alpha0 value (used when mode=fixed)")
-parser.add_argument("--lr_alpha0",type=float,default=1e-3,help="Learning rate for learnable alpha0 parameter a")
-parser.add_argument("--beta",type=float,default=1.0,help="Regularization strength for learnable alpha0")
+parser.add_argument("--mode", choices=["standard", "fixed", "learnable"], default="standard")
+parser.add_argument("--epochs", type=int, default=50)
+parser.add_argument("--batch_size", type=int, default=16)
+parser.add_argument("--lr", type=float, default=1e-5)
+parser.add_argument("--fixed_alpha0", type=float, default=10.0)
+parser.add_argument("--lr_alpha0", type=float, default=1e-3)
+parser.add_argument("--beta", type=float, default=1.0)
 args = parser.parse_args()
 
+UNCERTAINTY_BUFFER = defaultdict(lambda: defaultdict(dict))
 
-df_train = pd.read_csv("train_amazon.csv", header=None)
-df_test = pd.read_csv("test_amazon.csv", header=None)
+df_train = pd.read_csv("train_amazon.csv", header=None,nrows=15000)
+df_test = pd.read_csv("test_amazon.csv", header=None,nrows=15000)
 
-n_train = 10000
-n_test = 5000
+df_train = df_train.iloc[:10000]
+df_test = df_test.iloc[:5000]
 
-df_train_actual = df_train.iloc[:n_train]
-df_test_actual = df_test.iloc[:n_test]
-
-samples_train = df_train_actual.iloc[:, 2].values
-gt_labels_train = df_train_actual.iloc[:, 0].values.astype(int)
-
-samples_test = df_test_actual.iloc[:, 2].values
-gt_labels_test = df_test_actual.iloc[:, 0].values.astype(int)
-
+samples_train = df_train.iloc[:, 2].values
+gt_labels_train = df_train.iloc[:, 0].values.astype(int)
+samples_test = df_test.iloc[:, 2].values
+gt_labels_test = df_test.iloc[:, 0].values.astype(int)
 
 class PromptFormatting(object):
     def __init__(self):
@@ -59,198 +54,153 @@ class PromptFormatting(object):
     def format_content(self, content):
         return "review: {}\nthe review is ".format(content)
 
-
 llm = LLM(
     model_name="mistralai/Mistral-7B-Instruct-v0.3",
     use_reduced_precision=True,
-    use_lora=True
+    use_lora=True,
 )
 
 classifier = LLMClassifier(model=llm, prompt_formatting=PromptFormatting())
 
-
-probs = torch.load("amazon_llora_teacher_probs.pt", weights_only=False)
-weights = torch.full((10000,), 1.0 / 10000.0, dtype=torch.float32)
-
-#probs = probs.to(llm.device)
-weights = weights.to(llm.device)
-
-
+teacher_probs = torch.load("amazon_llora_teacher_probs.pt", map_location="cpu")
+weights = torch.full((10000,), 1.0 / 10000.0).to(llm.device)
 
 class DirichletDataset(Dataset):
     def __init__(self, samples):
         self.samples = samples
-
     def __len__(self):
         return len(self.samples)
-
     def __getitem__(self, idx):
         return self.samples[idx], idx
-
-
 
 def dirichlet_loss(alpha, probs, weights):
     alpha0 = alpha.sum(dim=1, keepdim=True)
     log_gamma_alpha0 = torch.lgamma(alpha0)
     log_gamma_alpha = torch.lgamma(alpha).sum(dim=1, keepdim=True)
-
     weighted_log_probs = (alpha.unsqueeze(-1) - 1) * torch.log(probs + 1e-8)
     class_sum = weighted_log_probs.sum(dim=1)
-
     if weights.ndim == 1:
         weights = weights.unsqueeze(1)
-
     prompt_sum = (class_sum * weights.T).sum(dim=1, keepdim=True)
     return -(log_gamma_alpha0 - log_gamma_alpha + prompt_sum).mean()
-
 
 a = torch.nn.Parameter(torch.tensor(2.3025851, device=llm.device))
 
 def alpha0_l2_regularizer(alpha, a, beta):
     alpha0 = alpha.sum(dim=1)
-    alpha0_prior = torch.exp(a)
-    return beta * ((alpha0 - alpha0_prior) ** 2).mean()
-
-
+    return beta * ((alpha0 - torch.exp(a)) ** 2).mean()
 
 def compute_uncertainties(alpha):
     alpha0 = alpha.sum(dim=1, keepdim=True)
     probs = alpha / alpha0
-
-    total_uncertainty = -torch.sum(probs * torch.log(probs + 1e-8), dim=1)
-
+    total = -torch.sum(probs * torch.log(probs + 1e-8), dim=1)
     psi_alpha0 = digamma(alpha0 + 1.0)
     psi_alpha = digamma(alpha + 1.0)
+    aleatoric = torch.sum(probs * (psi_alpha0 - psi_alpha), dim=1)
+    epistemic = total - aleatoric
+    return total, aleatoric, epistemic
 
-    data_uncertainty = torch.sum(probs * (psi_alpha0 - psi_alpha), dim=1)
-    knowledge_uncertainty = total_uncertainty - data_uncertainty
-
-    return total_uncertainty, data_uncertainty, knowledge_uncertainty
-
-
-
+def store_dirichlet_uncertainty(dataset, epoch, probs):
+    total,aleotoric,epistemic = compute_uncertainties(probs)
+    UNCERTAINTY_BUFFER[dataset][epoch] = {
+        "total_uncertainty": total.cpu().numpy(),
+        "aleatoric_uncertainty": aleotoric.cpu().numpy(),
+        "epistemic_uncertainty": epistemic.cpu().numpy(),
+    }
+    
 def amazon_uncertainties(alpha, epoch):
-    tu, du, ku = compute_uncertainties(alpha)
-    torch.save(
-        {"total_uncertainty": tu, "data_uncertainty": du, "knowledge_uncertainty": ku},
-        f"amazon_uncertainties_epoch{epoch}.pt"
-    )
+    store_dirichlet_uncertainty("amazon", epoch, alpha)
 
+class TestDirichletDataset(Dataset):
+        def __init__(self, samples):
+            self.samples = samples
+            
+
+        def __len__(self):
+            return len(self.samples)
+
+        def __getitem__(self, idx):
+            return self.samples[idx]
 
 def sst2_uncertainties(epoch):
-    df_test = pd.read_csv("test_sst2.csv")
-    samples = df_test.iloc[:, 1].values
-
+    df = pd.read_csv("test_sst2.csv", engine="python")
+    samples = df.iloc[:, 1].astype(str).values
     class PF(object):
         def __init__(self):
             self.INSTRUCTION = "Select the sentiment category that best matches the opinion expressed in the review snippet."
             self.CLASSES = ["negative", "positive"]
             self.CLASSES_FOR_MATCHING = [self.CLASSES, ["neg", "pos"], ["1", "2"]]
-            self.CLASSES_TEXT = "1. {}\n2. {}".format(self.CLASSES[0], self.CLASSES[1])
-
-        def format_instruction(self, instruction):
-            return "{}\n{}\n".format(instruction, self.CLASSES_TEXT)
-
-        def format_content(self, content):
-            return "review: {}\nthe review is ".format(content)
-
-    classifier_sst2 = LLMClassifier(model=llm, prompt_formatting=PF())
-
-    loader = DataLoader(samples, batch_size=16, shuffle=False)
+            self.CLASSES_TEXT = "1. {}\n2. {}".format(*self.CLASSES)
+        def format_instruction(self, i):
+            return "{}\n{}\n".format(i, self.CLASSES_TEXT)
+        def format_content(self, c):
+            return "review: {}\nthe review is ".format(c)
+    clf = LLMClassifier(model=llm, prompt_formatting=PF())
+    dataset = TestDirichletDataset(samples)
+    loader = DataLoader(dataset, batch_size=16, shuffle=False)
+    llm.model.eval()
     alphas = []
-
     with torch.no_grad():
-        for batch in loader:
-            alphas.append(classifier_sst2.soft_labels_batch(batch))
-
-    alpha = torch.cat(alphas, dim=0)
-    tu, du, ku = compute_uncertainties(alpha)
-
-    torch.save(
-        {"total_uncertainty": tu, "data_uncertainty": du, "knowledge_uncertainty": ku},
-        f"amazon_sst2_uncertainties_epoch{epoch}.pt"
-    )
-
+        for b in loader:
+            alphas.append(clf.soft_labels_batch(input_texts=b))
+    alpha = torch.cat(alphas)
+    store_dirichlet_uncertainty("sst2", epoch, alpha)
 
 def yahoo_uncertainties(epoch):
-    df_test = pd.read_csv("test_yahoo.csv", header=None)
+    df = pd.read_csv("test_yahoo.csv", header=None)
+    df = df.iloc[:5000]
     samples = (
-        "Question: " + df_test.iloc[:, 1].astype(str) + " " +
-        df_test.iloc[:, 2].astype(str) + "\nAnswer: " +
-        df_test.iloc[:, 3].astype(str)
+        "Question: " + df.iloc[:, 1].astype(str) + " " + df.iloc[:, 2].astype(str)
+        + "\nAnswer: " + df.iloc[:, 3].astype(str)
     ).values
-
     class PF(object):
         def __init__(self):
             self.INSTRUCTION = "Identify the topic that the following question and answer belong to:"
             self.CLASSES = [
-                "Society & Culture", "Science & Mathematics", "Health",
-                "Education & Reference", "Computers & Internet", "Sports",
-                "Business & Finance", "Entertainment & Music",
-                "Family & Relationships", "Politics & Government"
+                "Society & Culture","Science & Mathematics","Health","Education & Reference",
+                "Computers & Internet","Sports","Business & Finance","Entertainment & Music",
+                "Family & Relationships","Politics & Government",
             ]
             self.CLASSES_FOR_MATCHING = [self.CLASSES]
             self.CLASSES_TEXT = "\n".join([f"{i+1}. {c}" for i, c in enumerate(self.CLASSES)])
-
-        def format_instruction(self, instruction):
-            return "{}\n{}\n".format(instruction, self.CLASSES_TEXT)
-
-        def format_content(self, content):
-            return "{}\nthe topic is ".format(content)
-
-    classifier_yahoo = LLMClassifier(model=llm, prompt_formatting=PF())
-
-    loader = DataLoader(samples, batch_size=16, shuffle=False)
+        def format_instruction(self, i):
+            return f"{i}\n{self.CLASSES_TEXT}\n"
+        def format_content(self, c):
+            return f"{c}\nthe topic is "
+    clf = LLMClassifier(model=llm, prompt_formatting=PF())
+    dataset = TestDirichletDataset(samples)
+    loader = DataLoader(dataset, batch_size=16, shuffle=False)
+    llm.model.eval()
     alphas = []
-
     with torch.no_grad():
-        for batch in loader:
-            alphas.append(classifier_yahoo.soft_labels_batch(batch))
-
-    alpha = torch.cat(alphas, dim=0)
-    tu, du, ku = compute_uncertainties(alpha)
-
-    torch.save(
-        {"total_uncertainty": tu, "data_uncertainty": du, "knowledge_uncertainty": ku},
-        f"amazon_yahoo_uncertainties_epoch{epoch}.pt"
-    )
-
+        for b in loader:
+            alphas.append(clf.soft_labels_batch(input_texts=b))
+    alpha = torch.cat(alphas)
+    store_dirichlet_uncertainty("yahoo", epoch, alpha)
 
 def youtube_uncertainties(epoch):
-    df = pd.read_csv("youtube.csv")
-    samples = df.iloc[:, 3].values
-
+    df = pd.read_csv("youtube.csv", engine="python")[1245:]
+    samples = df.iloc[:, 3].astype(str).values
     class PF(object):
         def __init__(self):
             self.INSTRUCTION = "Judge whether the Youtube comment should be flagged as spam."
             self.CLASSES = ["not spam", "spam"]
             self.CLASSES_FOR_MATCHING = [self.CLASSES, ["ham", "spam"], ["0", "1"]]
-            self.CLASSES_TEXT = "1. {}\n2. {}".format(self.CLASSES[0], self.CLASSES[1])
-
-        def format_instruction(self, instruction):
-            return "{}\n{}\n".format(instruction, self.CLASSES_TEXT)
-
-        def format_content(self, content):
-            return "comment: {}\nthe comment is ".format(content)
-
-    classifier_yt = LLMClassifier(model=llm, prompt_formatting=PF())
-
-    loader = DataLoader(samples, batch_size=16, shuffle=False)
+            self.CLASSES_TEXT = "1. {}\n2. {}".format(*self.CLASSES)
+        def format_instruction(self, i):
+            return "{}\n{}\n".format(i, self.CLASSES_TEXT)
+        def format_content(self, c):
+            return "comment: {}\nthe comment is ".format(c)
+    clf = LLMClassifier(model=llm, prompt_formatting=PF())
+    dataset = TestDirichletDataset(samples)
+    loader = DataLoader(dataset, batch_size=16, shuffle=False)
+    llm.model.eval()
     alphas = []
-
     with torch.no_grad():
-        for batch in loader:
-            alphas.append(classifier_yt.soft_labels_batch(batch))
-
-    alpha = torch.cat(alphas, dim=0)
-    tu, du, ku = compute_uncertainties(alpha)
-
-    torch.save(
-        {"total_uncertainty": tu, "data_uncertainty": du, "knowledge_uncertainty": ku},
-        f"amazon_youtube_uncertainties_epoch{epoch}.pt"
-    )
-
-
+        for b in loader:
+            alphas.append(clf.soft_labels_batch(input_texts=b))
+    alpha = torch.cat(alphas)
+    store_dirichlet_uncertainty("youtube", epoch, alpha)
 
 def evaluate():
     def dirichlet_to_prob(alpha):
@@ -381,11 +331,11 @@ def train_student():
             print(f"Epoch {epoch+1}/{args.epochs}, Loss: {total_loss}")
 
         evaluate_train(epoch_alpha)
-        amazon_alpha_test = evaluate()
-        #amazon_uncertainties(amazon_alpha_test, epoch)
-        #yahoo_uncertainties(epoch)
-        #sst2_uncertainties(epoch)
-        #youtube_uncertainties(epoch)
+        test_alpha = evaluate()
+        amazon_uncertainties(test_alpha, epoch)
+        sst2_uncertainties(epoch)
+        yahoo_uncertainties(epoch)
+        youtube_uncertainties(epoch)
 
     final_train_alphas = []
     llm.model.eval()
@@ -403,13 +353,13 @@ def train_student():
     final_train_alphas = torch.cat(final_train_alphas, dim=0)
     evaluate_train(final_train_alphas)
 
+def save_uncertainty_buffer():
+    torch.save(dict(UNCERTAINTY_BUFFER),"amazon_dirichlet_uncertainties.pt")
 
-
-amazon_alpha_test = evaluate()
-#amazon_uncertainties(amazon_alpha_test,epoch)
-#yahooss_uncertainties(epoch)
-#sst2_uncertainties(epoch)
-#youtube_uncertainties(epoch)
+test_alpha = evaluate()
+amazon_uncertainties(test_alpha, "pretrained")
+sst2_uncertainties("pretrained")
+yahoo_uncertainties("pretrained")
+youtube_uncertainties("pretrained")
 train_student()
-
-
+save_uncertainty_buffer()
