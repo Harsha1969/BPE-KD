@@ -23,7 +23,7 @@ from llm_classifier_modified import LLMClassifier
 from llm_model_modified1 import LLM
 import random
 import evaluation
-
+from collections import defaultdict
 
 UNCERTAINTY_BUFFER = defaultdict(lambda: defaultdict(dict))
 
