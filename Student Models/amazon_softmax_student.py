@@ -25,7 +25,7 @@ import random
 import evaluation
 
 
-# In[3]:
+UNCERTAINTY_BUFFER = defaultdict(lambda: defaultdict(dict))
 
 
 # Load Amazon reviews polarity train and test data
@@ -84,14 +84,7 @@ probs = torch.load("amazon_llora_teacher_probs.pt", weights_only=False)
 print(probs[0])
 # Create weights (CPU)
 weights = torch.full((10000,), 1.0 / 10000.0, dtype=torch.float32)
-
-# Move everything to GPU at once
-#probs = probs.to(llm.device)
 weights = weights.to(llm.device)
-
-
-
-# In[6]:
 
 
 def safe_normalize_and_clamp(x):
@@ -109,7 +102,128 @@ def dirichlet_loss(student_probs, target_probs):
     return F.kl_div(student.log(), target, reduction='batchmean')
 
 
-# In[7]:
+def compute_uncertainties(probs):
+    if isinstance(probs, np.ndarray):
+        probs = torch.tensor(probs, dtype=torch.float32)
+    return -torch.sum(probs * torch.log(probs + 1e-8), dim=1)
+
+def store_softmax_uncertainty(dataset, epoch, probs):
+    total = compute_uncertainties(probs)
+    UNCERTAINTY_BUFFER[dataset][epoch] = {
+        "total_uncertainty": total.cpu().numpy(),
+        "aleatoric_uncertainty": total.cpu().numpy(),
+        "epistemic_uncertainty": torch.zeros_like(total).cpu().numpy(),
+    }
+
+class TestDataset(Dataset):
+        def __init__(self, samples): self.samples = samples
+        def __len__(self): return len(self.samples)
+        def __getitem__(self, idx): return self.samples[idx]
+
+def amazon_uncertainties(amazon_probs_test, epoch):
+    store_softmax_uncertainty("amazon", epoch, amazon_probs_test)
+
+
+def yahoo_uncertainties(epoch):
+    df_test = pd.read_csv('test_yahoo.csv', header=None).iloc[:5000]
+
+    def format_prompt(q1, q2, a):
+        return "Question: " + q1.astype(str) + " " + q2.astype(str) + "\nAnswer: " + a.astype(str)
+
+    samples_test = format_prompt(
+        df_test.iloc[:, 1],
+        df_test.iloc[:, 2],
+        df_test.iloc[:, 3]
+    ).values
+
+    class PromptFormatting(object):
+        def __init__(self):
+            self.INSTRUCTION = 'Identify the topic that the following question and answer belong to:'
+            self.CLASSES = [
+                'Society & Culture','Science & Mathematics','Health','Education & Reference',
+                'Computers & Internet','Sports','Business & Finance','Entertainment & Music',
+                'Family & Relationships','Politics & Government'
+            ]
+            self.CLASSES_FOR_MATCHING = [self.CLASSES]
+            self.CLASSES_TEXT = "\n".join([f"{i+1}. {c}" for i, c in enumerate(self.CLASSES)])
+
+        def format_instruction(self, instruction):
+            return f"{instruction}\n{self.CLASSES_TEXT}\n"
+
+        def format_content(self, content):
+            return f"{content}\nthe topic is "
+
+    classifier_yahoo = LLMClassifier(model=llm, prompt_formatting=PromptFormatting())
+
+    loader = DataLoader(TestDataset(samples_test), batch_size=16, shuffle=False)
+
+    llm.model.eval()
+    probs_out = []
+    with torch.no_grad():
+        for b in loader:
+            probs_out.append(classifier_yahoo.soft_labels_batch(input_texts=b))
+
+    store_softmax_uncertainty("yahoo", epoch, torch.cat(probs_out).cpu().numpy())
+
+
+def sst2_uncertainties(epoch):
+    df_test = pd.read_csv('test_sst2.csv')
+    samples_test = df_test.iloc[:, 1].values
+
+    class PromptFormatting(object):
+        def __init__(self):
+            self.INSTRUCTION = 'Select the sentiment category that best matches the opinion expressed in the review snippet.'
+            self.CLASSES = ['negative', 'positive']
+            self.CLASSES_FOR_MATCHING = [self.CLASSES, ['neg', 'pos'], ['1', '2']]
+            self.CLASSES_TEXT = '''1. {}\n2. {}'''.format(self.CLASSES[0], self.CLASSES[1])
+
+        def format_instruction(self, instruction):
+            return '''{}\n{}\n'''.format(instruction, self.CLASSES_TEXT)
+
+        def format_content(self, content):
+            return '''review: {}\nthe review is '''.format(content)
+
+    classifier_sst2 = LLMClassifier(model=llm, prompt_formatting=PromptFormatting())
+
+    loader = DataLoader(TestDataset(samples_test), batch_size=16, shuffle=False)
+
+    llm.model.eval()
+    probs_out = []
+    with torch.no_grad():
+        for b in loader:
+            probs_out.append(classifier_sst2.soft_labels_batch(input_texts=b))
+
+    store_softmax_uncertainty("sst2", epoch, torch.cat(probs_out).cpu().numpy())
+
+
+def youtube_uncertainties(epoch):
+    df = pd.read_csv('youtube.csv')[1245:]
+    samples_test = df.iloc[:, 3].values
+
+    class PromptFormatting(object):
+        def __init__(self):
+            self.INSTRUCTION = 'Judge whether the Youtube comment should be flagged as spam.'
+            self.CLASSES = ['not spam', 'spam']
+            self.CLASSES_FOR_MATCHING = [self.CLASSES, ['ham', 'spam'], ['0', '1']]
+            self.CLASSES_TEXT = '''1. {}\n2. {}'''.format(self.CLASSES[0], self.CLASSES[1])
+
+        def format_instruction(self, instruction):
+            return '''{}\n{}\n'''.format(instruction, self.CLASSES_TEXT)
+
+        def format_content(self, content):
+            return '''comment: {}\nthe comment is '''.format(content)
+
+    classifier_yt = LLMClassifier(model=llm, prompt_formatting=PromptFormatting())
+
+    loader = DataLoader(TestDataset(samples_test), batch_size=16, shuffle=False)
+
+    llm.model.eval()
+    probs_out = []
+    with torch.no_grad():
+        for b in loader:
+            probs_out.append(classifier_yt.soft_labels_batch(input_texts=b))
+
+    store_softmax_uncertainty("youtube", epoch, torch.cat(probs_out).cpu().numpy())
 
 
 def evaluate():
@@ -224,7 +338,11 @@ def train_student(samples_train, probs, weights, num_epochs=200, learning_rate=1
         epoch_prob = torch.cat(epoch_probs, dim=0)
         print(f"Epoch {epoch+1}/{num_epochs}, Loss: {total_loss}")
         evaluate_train(epoch_prob)
-        evaluate()
+        test_probs = evaluate()
+        amazon_uncertainties(test_probs, epoch)
+        yahoo_uncertainties(epoch)
+        sst2_uncertainties(epoch)
+        youtube_uncertainties(epoch)
     final_train_probs = []
     full_dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     llm.model.eval()
@@ -235,5 +353,13 @@ def train_student(samples_train, probs, weights, num_epochs=200, learning_rate=1
     final_train_probs = torch.cat(final_train_probs, dim=0)
     evaluate_train(final_train_probs)
 
-evaluate()
+def save_uncertainty_buffer():
+    torch.save(dict(UNCERTAINTY_BUFFER),"amazon_softmax_llora_uncertainties_seed-2.pt")
+    
+pretrained_probs = evaluate()
+amazon_uncertainties(pretrained_probs, "pretrained")
+yahoo_uncertainties("pretrained")
+sst2_uncertainties("pretrained")
+youtube_uncertainties("pretrained")
 train_student(samples_train, probs, weights, batch_size=16)
+save_uncertainty_buffer()
