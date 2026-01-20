@@ -245,7 +245,7 @@ def evaluate():
 
 
 
-    stu_probs = get_test_alpha(test_dataloader, classifier)
+    stu_probs = get_test_probs(test_dataloader, classifier)
     stu_probs=stu_probs.cpu().numpy()
     f1_score = evaluation.compute_metric(gt_labels_test, stu_probs, metric='f1')
     ece = evaluation.compute_metric(gt_labels_test, stu_probs, metric='ece')
