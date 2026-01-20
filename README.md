@@ -72,17 +72,17 @@ youtube_teacher.ipynb
 #### 1B. Laplace LoRA
 - Finetune the LLM using LoRA on the datasets and save the checkpoints.
   ```bash
-   python custom_run_gpt_amazon.py
-   python custom_run_gpt_sst2.py
-   python custom_run_gpt_yahoo.py
-   python custom_run_gpt_youtube.py
+   accelerate launch custom_run_gpt_amazon.py
+   accelerate launch custom_run_gpt_sst2.py
+   accelerate launch custom_run_gpt_yahoo.py
+   accelerate launch custom_run_gpt_youtube.py
   ```
 - Run post-hoc Laplace approximation on saved checkpoints.
   ```bash
-  python custom_run_gpt_amazon_laplace.py
-  python custom_run_gpt_sst2_laplace.py
-  python custom_run_gpt_yahoo_laplace.py
-  python custom_run_gpt_youtube_laplace.py
+  accelerate launch custom_run_gpt_amazon_laplace.py
+  accelerate launch custom_run_gpt_sst2_laplace.py
+  accelerate launch custom_run_gpt_yahoo_laplace.py
+  accelerate launch custom_run_gpt_youtube_laplace.py
   ```
 ### Step 2: Train the Student Models
 #### 2A. Softmax-based Student (using KL Divergence Loss)
