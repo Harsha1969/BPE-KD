@@ -1,24 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
-
-import os
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-
-
-# In[2]:
-
-
 import pandas as pd
 import numpy as np
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
-from llm_classifier_modified import LLMClassifier
-from llm_model_modified1_Copy2 import LLM
+from llm_classifier_student import LLMClassifier
+from llm_model_softmax_student import LLM
 import evaluation
 
 
