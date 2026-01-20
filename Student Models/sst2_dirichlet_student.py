@@ -1,12 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import os
 import argparse
-
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-
 import pandas as pd
 import torch
 import torch.optim as optim
@@ -262,6 +257,7 @@ def train_student():
 
 evaluate()
 train_student()
+
 
 
 
