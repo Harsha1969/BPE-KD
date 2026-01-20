@@ -12,7 +12,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torch.special import digamma
 from collections import defaultdict
-
+import evaluation
 from llm_classifier_modified import LLMClassifier
 from llm_model_modified import LLM
 
@@ -363,3 +363,4 @@ yahoo_uncertainties("pretrained")
 youtube_uncertainties("pretrained")
 train_student()
 save_uncertainty_buffer()
+
