@@ -1,7 +1,7 @@
 import numpy as np
 import pickle
-from llm_model import LLM
-from llm_classifier import LLMClassifier
+from llm_model_teacher import LLM
+from llm_classifier_teacher import LLMClassifier
 from ensemble_scaler import EnsembleScaler
 
 SMALL_CONSTANT = 0.00001
