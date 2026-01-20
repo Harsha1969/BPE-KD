@@ -12,9 +12,8 @@ import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torch.special import digamma
-
-from llm_classifier_modified import LLMClassifier
-from llm_model_modified_Copy2 import LLM
+from llm_classifier_student import LLMClassifier
+from llm_model_dirichlet_student import LLM
 import evaluation
 
 parser = argparse.ArgumentParser()
@@ -386,6 +385,7 @@ alpha_test = evaluate()
 #sst2_uncertainties(epoch)
 #youtube_uncertainties(epoch)
 train_student()
+
 
 
 
