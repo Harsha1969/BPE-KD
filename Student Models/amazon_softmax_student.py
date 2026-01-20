@@ -3,17 +3,6 @@
 
 # ## Student Model(with softmax output) training and evaluation on Amazon reviews polarity dataset
 
-# In[1]:
-
-
-import os
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
-
-# In[2]:
-
-
 import pandas as pd
 import numpy as np
 import torch
@@ -21,6 +10,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from llm_classifier_modified import LLMClassifier
 from llm_model_modified1 import LLM
+from torch.utils.data import Dataset, DataLoader
 import random
 import evaluation
 from collections import defaultdict
