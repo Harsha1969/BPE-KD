@@ -8,8 +8,8 @@ import numpy as np
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
-from llm_classifier_modified import LLMClassifier
-from llm_model_modified1 import LLM
+from llm_classifier_student import LLMClassifier
+from llm_model_softmax_student import LLM
 from torch.utils.data import Dataset, DataLoader
 import random
 import evaluation
