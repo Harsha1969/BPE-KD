@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import os
-import sys
 import argparse
 import pandas as pd
 import torch
@@ -361,6 +359,7 @@ yahoo_uncertainties("pretrained")
 youtube_uncertainties("pretrained")
 train_student()
 save_uncertainty_buffer()
+
 
 
 
