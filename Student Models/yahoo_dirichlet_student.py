@@ -118,113 +118,6 @@ def alpha0_l2_regularizer(alpha, a, beta):
     alpha0_prior = torch.exp(a)
     return beta * ((alpha0 - alpha0_prior) ** 2).mean()
 
-
-def compute_uncertainties(alpha):
-    alpha0 = alpha.sum(dim=1, keepdim=True)
-    probs = alpha / alpha0
-
-    total_uncertainty = -torch.sum(probs * torch.log(probs + 1e-8), dim=1)
-    data_uncertainty = torch.sum(
-        probs * (digamma(alpha0 + 1.0) - digamma(alpha + 1.0)), dim=1
-    )
-    knowledge_uncertainty = total_uncertainty - data_uncertainty
-
-    return total_uncertainty, data_uncertainty, knowledge_uncertainty
-
-
-def yahoo_uncertainties(alpha, epoch):
-    tu, du, ku = compute_uncertainties(alpha)
-    torch.save(
-        {"total_uncertainty": tu, "data_uncertainty": du, "knowledge_uncertainty": ku},
-        f"yahoo_uncertainties_seed{seed}_epoch{epoch}.pt"
-    )
-
-def amazon_uncertainties(epoch):
-    df = pd.read_csv("test_amazon.csv", header=None)
-    samples = df.iloc[:5000, 2].values
-
-    class PF(object):
-        def __init__(self):
-            self.INSTRUCTION = "classify the sentiment of the Amazon review below into one of the following classes:"
-            self.CLASSES = ["negative", "positive"]
-            self.CLASSES_TEXT = "1. negative\n2. positive"
-
-        def format_instruction(self, instruction):
-            return f"{instruction}\n{self.CLASSES_TEXT}\n"
-
-        def format_content(self, content):
-            return f"review: {content}\nthe review is "
-
-    clf = LLMClassifier(model=llm, prompt_formatting=PF())
-    loader = DataLoader(samples, batch_size=16, shuffle=False)
-
-    alphas = []
-    with torch.no_grad():
-        for b in loader:
-            alphas.append(clf.soft_labels_batch(b))
-
-    alpha = torch.cat(alphas, dim=0)
-    tu, du, ku = compute_uncertainties(alpha)
-    torch.save({"total": tu, "data": du, "knowledge": ku},
-               f"amazon_uncertainties_epoch{epoch}.pt")
-
-def sst2_uncertainties(epoch):
-    df = pd.read_csv("test_sst2.csv")
-    samples = df.iloc[:, 1].values
-
-    class PF(object):
-        def __init__(self):
-            self.INSTRUCTION = "Select the sentiment category that best matches the opinion expressed in the review snippet."
-            self.CLASSES_TEXT = "1. negative\n2. positive"
-
-        def format_instruction(self, instruction):
-            return f"{instruction}\n{self.CLASSES_TEXT}\n"
-
-        def format_content(self, content):
-            return f"review: {content}\nthe review is "
-
-    clf = LLMClassifier(model=llm, prompt_formatting=PF())
-    loader = DataLoader(samples, batch_size=16, shuffle=False)
-
-    alphas = []
-    with torch.no_grad():
-        for b in loader:
-            alphas.append(clf.soft_labels_batch(b))
-
-    alpha = torch.cat(alphas, dim=0)
-    tu, du, ku = compute_uncertainties(alpha)
-    torch.save({"total": tu, "data": du, "knowledge": ku},
-               f"sst2_uncertainties_epoch{epoch}.pt")
-
-def youtube_uncertainties(epoch):
-    df = pd.read_csv("youtube.csv")
-    samples = df.iloc[:, 3].values
-
-    class PF(object):
-        def __init__(self):
-            self.INSTRUCTION = "Judge whether the Youtube comment should be flagged as spam."
-            self.CLASSES_TEXT = "1. not spam\n2. spam"
-
-        def format_instruction(self, instruction):
-            return f"{instruction}\n{self.CLASSES_TEXT}\n"
-
-        def format_content(self, content):
-            return f"comment: {content}\nthe comment is "
-
-    clf = LLMClassifier(model=llm, prompt_formatting=PF())
-    loader = DataLoader(samples, batch_size=16, shuffle=False)
-
-    alphas = []
-    with torch.no_grad():
-        for b in loader:
-            alphas.append(clf.soft_labels_batch(b))
-
-    alpha = torch.cat(alphas, dim=0)
-    tu, du, ku = compute_uncertainties(alpha)
-    torch.save({"total": tu, "data": du, "knowledge": ku},
-               f"youtube_uncertainties_epoch{epoch}.pt")
-
-
 def evaluate():
     def dirichlet_to_prob(alpha):
         return alpha / alpha.sum(dim=1, keepdim=True)
@@ -270,7 +163,6 @@ def evaluate():
         )
     )
 
-    return alpha_test
 
 def evaluate_train(epoch_alpha):
     probs_np = (epoch_alpha / epoch_alpha.sum(dim=1, keepdim=True)).cpu().numpy()
@@ -350,11 +242,8 @@ def train_student():
             print(f"Epoch {epoch+1}/{args.epochs}, Loss: {total_loss}")
 
         evaluate_train(epoch_alpha)
-        yahoo_alpha_test = evaluate()
-        #yahoo_uncertainties(yahoo_alpha_test, epoch)
-        #amazon_uncertainties(epoch)
-        #sst2_uncertainties(epoch)
-        #youtube_uncertainties(epoch)
+        evaluate()
+
 
     final_train_alphas = []
     llm.model.eval()
@@ -374,12 +263,9 @@ def train_student():
 
 
 
-alpha_test = evaluate()
-#yahoo_uncertainties(alpha_test,epoch)
-#amazon_uncertainties(epoch)
-#sst2_uncertainties(epoch)
-#youtube_uncertainties(epoch)
+evaluate()
 train_student()
+
 
 
 
