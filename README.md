@@ -1,17 +1,27 @@
 # Uncertainty Modeling in Large Language Models (LLMs)
 
-This project presents a framework for efficient uncertainty estimation in Large Language Models (LLMs) by distilling the knowledge from a Bayesian Prompt Ensemble (BayesPE) into a student LLM. The approach allows reliable uncertainty estimation in a **single forward pass**, overcoming the computational inefficiencies of traditional Bayesian inference methods.
+This project presents a framework for efficient uncertainty estimation in Large Language Models (LLMs) by distilling uncertainty-aware knowledge from **Bayesian teacher models** into a student LLM.
 
-The student model outputs Dirichlet concentration parameters instead of softmax probabilities, enabling it to represent both predicted class probabilities and the associated confidence. Fine-tuning is done using **LoRA** (Low-Rank Adaptation) for memory efficiency.
+The student model outputs **Dirichlet concentration parameters** instead of softmax probabilities, enabling it to represent both predicted class probabilities and associated uncertainty. Fine-tuning is done using **LoRA** (Low-Rank Adaptation) for memory efficiency.
 
 ---
 
 ## Approach Overview
 
-### 1. **Teacher Model – Bayesian Prompt Ensembles (BayesPE)**
-- Multiple semantically equivalent prompts are queried.
-- Prompt weights are learned via variational inference on a small validation set.
-- Final prediction is a weighted combination of all prompt outputs.
+### 1. **Teacher Models – Bayesian Uncertainty Estimators**
+This framework uses Bayesian teacher models to generate uncertainty-aware predictive distributions.
+
+- **Bayesian Prompt Ensembles (BayesPE)**
+  - Multiple semantically equivalent prompts are queried.
+  - Prompt weights are learned via variational inference on a small validation set.
+  - Final prediction is a weighted combination of all prompt outputs.
+
+- **Laplace-LoRA**
+  - A LoRA-finetuned LLM is treated as a Bayesian model using a Laplace approximation.
+  - The posterior is approximated around the MAP solution.
+  - Predictive uncertainty is obtained by marginalizing over the approximate posterior.
+
+Both teacher models provide calibrated predictive distributions used for student distillation.
 
 ### 2. **Student Model – Dirichlet Output LLM**
 - Final layer modified to produce Dirichlet parameters: `α = 1 + softplus(logits)`.
@@ -44,11 +54,11 @@ pip install -r requirements.txt
 
 All scripts use **Mistral-7B-Instruct v0.3** as the base model and require GPU (A100 recommended ~40GB).
 
-### Step 1: Run the Teacher (BayesPE) Inference
-
+### Step 1: Run the Teacher Inference
+#### 1A. Bayesian Prompt Ensembles (BayesPE)
 For each dataset, run the corresponding notebook to:
 - Query the model with multiple prompts.
-- Save prompt-wise class probabilities and learned weights.
+- Save prompt-wise class probabilities and learned weights which are needed to train student models.
 - Evaluate performance on the test data.
 
 ```bash
@@ -58,11 +68,26 @@ sst2_teacher.ipynb
 yahoo_teacher.ipynb
 youtube_teacher.ipynb
 ```
+
+#### 1B. Laplace LoRA
+- Finetune the LLM using LoRA on the datasets and save the checkpoints.
+  ```bash
+   python custom_run_gpt_amazon.py
+   python custom_run_gpt_sst2.py
+   python custom_run_gpt_yahoo.py
+   python custom_run_gpt_youtube.py
+  ```
+- Run post-hoc Laplace approximation on saved checkpoints.
+  ```bash
+  python custom_run_gpt_amazon_laplace.py
+  python custom_run_gpt_sst2_laplace.py
+  python custom_run_gpt_yahoo_laplace.py
+  python custom_run_gpt_youtube_laplace.py
+  ```
 ### Step 2: Train the Student Models
 #### 2A. Softmax-based Student (using KL Divergence Loss)
 
-For each dataset, run the corresponding notebook to:
-- Train using the best prompt from BayesPE and KL divergence between student and teacher probabilities.
+- Trained using minimization of KL divergence between student and teacher probabilities as objective.
 - Evaluate performance on the test data.
   
 ```bash
@@ -73,14 +98,14 @@ python youtube_softmax_student.py
 ```
 #### 2B. Dirichlet-based Student (using Dirichlet based distillation Loss)
 
-For each dataset, run the corresponding notebook to:
 - This student learns to predict Dirichlet parameters that match the teacher's ensembled behavior.
-- Train using the best prompt from BayesPE and dirichlet based distillation loss between student and teacher probabilities.
+- Train using dirichlet based distillation loss between student and teacher probabilities.
 - Evaluate performance on the test data.
+- Different variants of regularizers are supported.
 #### Command-Line Arguments
 
 This script supports multiple Dirichlet student training modes via command-line arguments.
-You can switch between **normal**, **fixed α₀**, and **learnable α₀** setups without modifying the code.
+You can switch between **standard**, **fixed α₀**, and **learnable α₀** setups without modifying the code.
 
 
 ##### `--mode`
@@ -167,5 +192,5 @@ python amazon_dirichlet_student.py --mode learnable --lr_alpha0 1e-3 --beta 1.0
 ```
 Make sure the files *_probs.pt and *_prompt_weights.pt exist before training the student which can be accesible from the link: https://drive.google.com/drive/folders/1dcoBRWcEM9eFrzFYsrh5YXLxXyqOi7gT?usp=sharing
   
-The notebooks `amazon_teacher.ipynb`, `amazon_softmax_student.py`, and `amazon_dirichlet_student.py` also include **out-of-distribution (OOD) evaluation**.  
-These models are trained only on the **Amazon Reviews** dataset but tested on other domains such as **Yahoo Answers**, **SST-2**, and **YouTube Comments** to assess out-of-distribution detection abilities of model and predictive uncertainty.
+The files `amazon_teacher.ipynb`, `amazon_softmax_student.py`, and `amazon_dirichlet_student.py` also include **out-of-distribution (OOD) evaluation**.  
+These models are trained only on the **Amazon Reviews** dataset and tested on other domains such as **Yahoo Answers**, **SST-2**, and **YouTube Comments** to assess out-of-distribution detection abilities of model and predictive uncertainty.
