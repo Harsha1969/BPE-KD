@@ -166,6 +166,12 @@ python amazon_dirichlet_student.py --mode fixed --fixed_alpha0 10
 python amazon_dirichlet_student.py --mode learnable --lr_alpha0 1e-3 --beta 1.0
 ```
 Make sure the files *_probs.pt and *_prompt_weights.pt exist before training the student which can be accesible from the link: https://drive.google.com/drive/folders/1dcoBRWcEM9eFrzFYsrh5YXLxXyqOi7gT?usp=sharing
-  
+
 The notebooks `amazon_teacher.ipynb`, `amazon_softmax_student.py`, and `amazon_dirichlet_student.py` also include **out-of-distribution (OOD) evaluation**.  
 These models are trained only on the **Amazon Reviews** dataset but tested on other domains such as **Yahoo Answers**, **SST-2**, and **YouTube Comments** to assess out-of-distribution detection abilities of model and predictive uncertainty.
+
+
+
+## License and Attribution
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This repository incorporates code from [BayePE](https://github.com/amzn/BayesPE) and [Laplace LoRA](https://github.com/adamxyang/laplace-lora.git), which are licensed under the Apache-2.0 license and the MIT license respectively.
