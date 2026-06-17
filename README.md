@@ -173,5 +173,5 @@ These models are trained only on the **Amazon Reviews** dataset but tested on ot
 
 
 ## License and Attribution
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-This repository incorporates code from [BayePE](https://github.com/amzn/BayesPE) and [Laplace LoRA](https://github.com/adamxyang/laplace-lora.git), which are licensed under the Apache-2.0 license and the MIT license respectively.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.  
+This repository incorporates and modifies code from [BayePE](https://github.com/amzn/BayesPE) and [Laplace LoRA](https://github.com/adamxyang/laplace-lora.git), which are licensed under the Apache-2.0 license and the MIT license respectively.
